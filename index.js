@@ -43,15 +43,15 @@ const move = async (player, direction) => {
 
 	console.log(`Moving ${player} ${direction}`)
 
-  let sha
-  try {
-    const { data } = await octokit.repos.getContents({
-		  owner: player,
-		  repo: "gitland-client",
-		  path: "act"
-	  })
-    sha = data.sha
-  } catch (_) {}
+	let sha
+	try {
+		const { data } = await octokit.repos.getContents({
+			owner: player,
+			repo: "gitland-client",
+			path: "act"
+		})
+		sha = data.sha
+	} catch (_) { }
 
 	await octokit.repos.createOrUpdateFile({
 		owner: player,
@@ -120,7 +120,7 @@ const runEvery = (duration, callback) => {
 }
 
 const runForPlayer = async player => {
-const map = await getMap()
+	const map = await getMap()
 	const { x, y } = await getPlayerLocation(player)
 
 	const obstacled = map.map(line => line.map(space => space.startsWith("c") ? 1 : 0))
@@ -158,11 +158,13 @@ const map = await getMap()
 	}
 
 	console.log("Couldn't find next unclaimed space!")
+	return move(player, "idle")
 }
 
 runEvery(60000, async () => {
-  await runForPlayer("Richienbland")
-  await runForPlayer("garygary1275")
-  await runForPlayer("Lolgamer521")
-  await runForPlayer("COGB35")
+	await runForPlayer("Richienbland")
+	await runForPlayer("garygary1275")
+	await runForPlayer("Lolgamer521")
+	await runForPlayer("COGB35")
+	await runForPlayer("Richienb")
 })
