@@ -1,0 +1,27 @@
+{
+  "name": "gitland-client",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/Richienbland/gitland-client.git",
+  "author": "Richie Bendall <richiebendall@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "test": "xo"
+  },
+  "dependencies": {
+    "@octokit/rest": "^17.6.0",
+    "atob-lite": "^2.0.0",
+    "btoa-lite": "^1.0.0",
+    "dotenv": "^8.2.0",
+    "hasha": "^5.2.0",
+    "num-sort": "^2.0.0",
+    "pathfinding": "^0.4.18"
+  },
+  "devDependencies": {
+    "eslint-config-richienb": "^0.4.2",
+    "xo": "^0.30.0"
+  },
+  "xo": {
+    "extends": "eslint-config-richienb"
+  }
+}
