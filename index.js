@@ -3,7 +3,8 @@ const toBase64 = require("btoa-lite")
 const fromBase64 = require("atob-lite")
 const PathFinding = require("pathfinding")
 const numberSort = require("num-sort")
-const difference = require("./lib/num-diff")
+const figures = require("figures")
+const numberDiff = require("num-diff")
 require("dotenv").config()
 
 const octokit = new Octokit({
@@ -36,12 +37,58 @@ const getPlayerLocation = async player => {
 	}
 }
 
+const getDecayMap = async () => {
+	const decay = await getFileContent({
+		owner: "programical",
+		repo: "gitland",
+		path: "decay"
+	})
+
+	return decay.split("\n").map(line => line.split(",").map(time => Number(time)))
+}
+
+const actionSymbol = new Map([
+	["up", figures.arrowUp],
+	["down", figures.arrowDown],
+	["left", figures.arrowLeft],
+	["right", figures.arrowRight]
+])
+
+const calculateDirectionCoordinates = (x, y, direction) => {
+	if (direction === "idle") {
+		return { x, y }
+	}
+
+	if (direction === "up") {
+		return { x, y: y - 1 }
+	}
+
+	if (direction === "down") {
+		return { x, y: y + 1 }
+	}
+
+	if (direction === "left") {
+		return { x: x - 1, y }
+	}
+
+	if (direction === "right") {
+		return { x: x + 1, y }
+	}
+
+	throw new TypeError("Unknown direction specified")
+}
+
 const move = async (player, direction) => {
-	const { x, y } = await getPlayerLocation(player)
-
-	console.log(`${player} is now at x: ${x}, y: ${y}`)
-
-	console.log(`Moving ${player} ${direction}`)
+	if (await getPlayerTeam(player) !== "red") {
+		console.log(figures.error, `${player} is not in the red team! Idling will be forced.`)
+		direction = "idle"
+	} else if (direction === "idle") {
+		console.log(figures.radioOff, `Idling ${player}`)
+	} else {
+		const { x, y } = await getPlayerLocation(player)
+		const { x: newX, y: newY } = calculateDirectionCoordinates(x, y, direction)
+		console.log(actionSymbol.get(direction), `Moving ${player} to ${newX}, ${newY}`)
+	}
 
 	let sha
 	try {
@@ -53,18 +100,22 @@ const move = async (player, direction) => {
 		sha = data.sha
 	} catch (_) { }
 
-	await octokit.repos.createOrUpdateFile({
-		owner: player,
-		repo: "gitland-client",
-		path: "act",
-		message: `Move ${direction}`,
-		content: toBase64(direction),
-		sha: sha,
-		committer: {
-			name: "Richienbland Bot",
-			email: "64409073+Richienbland@users.noreply.github.com"
-		}
-	})
+	try {
+		await octokit.repos.createOrUpdateFile({
+			owner: player,
+			repo: "gitland-client",
+			path: "act",
+			message: `Move ${direction}`,
+			content: toBase64(direction),
+			sha: sha,
+			committer: {
+				name: "Richienbland Bot",
+				email: "64409073+Richienbland@users.noreply.github.com"
+			}
+		})
+	} catch (error) {
+		console.log(figures.warning, `Failed to write move for ${player} because ${error.message}`)
+	}
 }
 
 const teamIds = new Map([
@@ -119,25 +170,27 @@ const runEvery = (duration, callback) => {
 	return () => clearInterval(id)
 }
 
-const runForPlayer = async player => {
-	const map = await getMap()
+const runForPlayer = async (player, { map }) => {
 	const { x, y } = await getPlayerLocation(player)
 
-	const obstacled = map.map(line => line.map(space => space.startsWith("c") ? 1 : 0))
+	const withObstacles = map.map(line => line.map(tile => tile.startsWith("c") ? 1 : 0))
+
+	const determineDistance = point => numberDiff(x, point.x) + numberDiff(y, point.y)
+
+	// Filter out decaying spaces: decayMap[thisY][thisX] > 30 - determineDistance({ y: thisY, x: thisX }))
 
 	const possibleLocations = []
-	obstacled.forEach((line, thisY) => line.forEach((space, thisX) => {
-		if (space !== 1 && map[thisY][thisX] !== "ur" && !(thisY === y && thisX === x)) {
+	withObstacles.forEach((line, thisY) => line.forEach((space, thisX) => {
+		if ((space !== 1 && !(thisY === y && thisX === x)) && map[thisY][thisX] !== "ur") {
 			possibleLocations.push({
 				y: thisY, x: thisX
 			})
 		}
 	}))
 
-	const determineDistance = point => difference(x, point.x) + difference(y, point.y)
 	const [closestPoint] = possibleLocations.map(point => [point, determineDistance(point)]).sort((a, b) => numberSort.ascending(a[1], b[1]))[0]
 
-	const grid = new PathFinding.Grid(obstacled)
+	const grid = new PathFinding.Grid(withObstacles)
 	const finder = new PathFinding.BestFirstFinder()
 	const nextCoordinates = finder.findPath(x, y, closestPoint.x, closestPoint.y, grid)[1]
 
@@ -157,14 +210,18 @@ const runForPlayer = async player => {
 		return move(player, "right")
 	}
 
-	console.log("Couldn't find next unclaimed space!")
+	console.log(figures.warning, `Couldn't find next available space for ${player}!`)
 	return move(player, "idle")
 }
 
 runEvery(60000, async () => {
-	await runForPlayer("Richienbland")
-	await runForPlayer("garygary1275")
-	await runForPlayer("Lolgamer521")
-	await runForPlayer("COGB35")
-	await runForPlayer("Richienb")
+	const map = await getMap()
+
+	const runPlayer = player => runForPlayer(player, { map })
+
+	await runPlayer("Richienbland")
+	await runPlayer("garygary1275")
+	await runPlayer("Lolgamer521")
+	await runPlayer("COGB35")
+	await runPlayer("Richienb")
 })
