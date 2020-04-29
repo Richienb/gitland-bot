@@ -170,6 +170,8 @@ const runEvery = (duration, callback) => {
 	return () => clearInterval(id)
 }
 
+const finder = new PathFinding.BestFirstFinder()
+
 const runForPlayer = async (player, { map }) => {
 	const { x, y } = await getPlayerLocation(player)
 
@@ -191,23 +193,26 @@ const runForPlayer = async (player, { map }) => {
 	const [closestPoint] = possibleLocations.map(point => [point, determineDistance(point)]).sort((a, b) => numberSort.ascending(a[1], b[1]))[0]
 
 	const grid = new PathFinding.Grid(withObstacles)
-	const finder = new PathFinding.BestFirstFinder()
-	const nextCoordinates = finder.findPath(x, y, closestPoint.x, closestPoint.y, grid)[1]
+	const coordinates = finder.findPath(x, y, closestPoint.x, closestPoint.y, grid)
 
-	if (nextCoordinates[1] < y) {
-		return move(player, "up")
-	}
+	if (coordinates) {
+		const nextCoordinates = coordinates[1]
 
-	if (nextCoordinates[0] < x) {
-		return move(player, "left")
-	}
+		if (nextCoordinates[1] < y) {
+			return move(player, "up")
+		}
 
-	if (nextCoordinates[1] > y) {
-		return move(player, "down")
-	}
+		if (nextCoordinates[0] < x) {
+			return move(player, "left")
+		}
 
-	if (nextCoordinates[0] > x) {
-		return move(player, "right")
+		if (nextCoordinates[1] > y) {
+			return move(player, "down")
+		}
+
+		if (nextCoordinates[0] > x) {
+			return move(player, "right")
+		}
 	}
 
 	console.log(figures.warning, `Couldn't find next available space for ${player}!`)
